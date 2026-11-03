@@ -15,6 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Find project folder
+        id: find
+        run: |
+          echo "Files in repo:"
+          find . -not -path './.git/*' -type f | head -60
+          f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "ERROR: settings.gradle.kts not found. The project files were not uploaded to the repo."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,20 +37,20 @@ jobs:
           gradle-version: 8.7
 
       - name: Build APK
-        working-directory: ChassidusFlip
+        working-directory: ${{ steps.find.outputs.dir }}
         run: gradle assembleDebug --no-daemon
 
-      - name: Rename APK
-        working-directory: ChassidusFlip
-        run: cp app/build/outputs/apk/debug/app-debug.apk chassidusflip.apk
+      - name: Copy APK
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/chassidusflip.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: chassidusflip-apk
-          path: ChassidusFlip/chassidusflip.apk
+          path: chassidusflip.apk
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ChassidusFlip/chassidusflip.apk
+          files: chassidusflip.apk
